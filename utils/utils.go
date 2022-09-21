@@ -10,6 +10,7 @@ func GetDirs(dirPth string) []string {
 	var files []string
 
 	root := dirPth
+
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			files = append(files, path)
@@ -20,7 +21,7 @@ func GetDirs(dirPth string) []string {
 		panic(err)
 	}
 	for _, file := range files {
-		fmt.Println(file)
+		fmt.Println(root, "==========", file)
 	}
 	return files
 }

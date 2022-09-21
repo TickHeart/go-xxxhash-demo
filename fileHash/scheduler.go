@@ -1,4 +1,4 @@
-package scheduler
+package fileHash
 
 import (
 	"github.com/cespare/xxhash/v2"
