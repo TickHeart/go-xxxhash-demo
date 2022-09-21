@@ -1,56 +1,87 @@
 package scheduler
 
 import (
-	"github.com/cespare/xxhash/v2"
-	"github.com/fsnotify/fsnotify"
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
+
+	"github.com/cespare/xxhash/v2"
+	"github.com/fsnotify/fsnotify"
 )
 
-func ModelSchedulerModel(eventPath, eventName string, watcher *fsnotify.Watcher) {
-	switch eventName {
+type Event struct {
+	Path string
+	Name string
+	mu   sync.RWMutex
+}
+
+func (e *Event) IgnoreSignal() bool {
+	models := []string{"CREATE", "REMOVE", "WRITE"}
+	isModel := false
+	isPath := false
+
+	for _, val := range models {
+		if val == e.Name {
+			isModel = true
+			break
+		}
+	}
+
+	matchString, _ := regexp.MatchString("~", e.Path)
+	if !matchString {
+		isPath = true
+	}
+
+	return isModel && isPath
+}
+
+func (e *Event) ModelSchedulerModel(watcher *fsnotify.Watcher, wg *sync.WaitGroup) {
+	switch e.Name {
 	case "CREATE":
-		createModel(eventPath, eventName, watcher)
-		break
+		go e.createModel(watcher, wg)
 	case "REMOVE":
 
-		break
 	case "WRITE":
-		writeModel(eventPath, eventName, watcher)
-		break
+		go e.writeModel(watcher, wg)
 	}
 }
 
-func createModel(eventPath, eventName string, watcher *fsnotify.Watcher) {
-	ms, _ := regexp.MatchString("yaml", eventPath)
-	isHash, _ := regexp.MatchString("\\.[\\d]+\\.", eventPath)
+func (e *Event) createModel(watcher *fsnotify.Watcher, wg *sync.WaitGroup) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	defer wg.Done()
+	ms, _ := regexp.MatchString("yaml", e.Path)
+	isHash, _ := regexp.MatchString("\\.[\\d]+\\.", e.Path)
 	if isHash {
 		return
 	}
 	if ms {
-		file, _ := os.ReadFile(eventPath)
+		file, _ := os.ReadFile(e.Path)
 		body := string(file)
 		//if len(body) <= 0 {
 		//	return
 		//}
-		fileRenameToXXHash(body, eventPath)
+		fileRenameToXXHash(body, e.Path)
 	} else {
-		err := watcher.Add(eventPath)
+		err := watcher.Add(e.Path)
 		if err != nil {
 			return
 		}
 	}
 }
-func writeModel(eventPath, eventName string, watcher *fsnotify.Watcher) {
-	ms, _ := regexp.MatchString("yaml", eventPath)
+func (e *Event) writeModel(watcher *fsnotify.Watcher, wg *sync.WaitGroup) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	defer wg.Done()
+	ms, _ := regexp.MatchString("yaml", e.Path)
 	if ms {
-		file, _ := os.ReadFile(eventPath)
+		file, _ := os.ReadFile(e.Path)
 		body := string(file)
 		//if len(body) <= 0 {
 		//	return
 		//}
-		updateFilenameXXHash(body, eventPath)
+		updateFilenameXXHash(body, e.Path)
 	}
 }
 
@@ -67,7 +98,7 @@ func fileRenameToXXHash(body string, path string) {
 
 func updateFilenameXXHash(body string, path string) {
 	sum64String := xxhash.Sum64String(body)
-	compile := regexp.MustCompile("\\.[\\d]+\\.")
+	compile := regexp.MustCompile(`\\.[\\d]+\\.`)
 	allString := compile.ReplaceAllString(path, "."+strconv.FormatUint(sum64String, 10)+".")
 	err := os.Rename(path, allString)
 	if err != nil {

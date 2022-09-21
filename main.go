@@ -3,9 +3,10 @@ package main
 import (
 	"awesomeProject/scheduler"
 	"awesomeProject/utils"
-	"github.com/fsnotify/fsnotify"
 	"log"
-	"regexp"
+	"sync"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 func main() {
@@ -14,62 +15,48 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer func(watcher *fsnotify.Watcher) {
-		err := watcher.Close()
-		if err != nil {
+	var wg sync.WaitGroup
+	wg.Add(1000)
+	startWatch(watcher, &wg)
+	wg.Wait()
+}
 
-		}
-	}(watcher)
-	cl := make(chan bool)
+func startWatch(watcher *fsnotify.Watcher, wg *sync.WaitGroup) {
+	var schedulerEvent *scheduler.Event
 	go func() {
 		for {
 			select {
 			case event, ok := <-watcher.Events:
+				log.Printf("%v", event)
 				if !ok {
+					log.Fatalln("接收失败")
 					return
 				}
-				eventPath := event.Name
-				eventName := event.Op.String()
-				signal := ignoreSignal(eventPath, eventName)
+				schedulerEvent = &scheduler.Event{
+					Name: event.Op.String(),
+					Path: event.Name,
+				}
+				signal := schedulerEvent.IgnoreSignal()
 
 				if signal {
-					scheduler.ModelSchedulerModel(eventPath, eventName, watcher)
+					schedulerEvent.ModelSchedulerModel(watcher, wg)
 				}
 
 				log.Println(event.String())
 			case err, ok := <-watcher.Errors:
 				if !ok {
+					log.Println("error:", err)
 					return
 				}
-				log.Println("error:", err)
 			}
 		}
 	}()
-
-	err = watcher.Add("./hahaha")
-	if err != nil {
-		log.Fatal(err)
-	}
-	<-cl
-}
-
-func ignoreSignal(eventPath, eventName string) bool {
-	models := []string{"CREATE", "REMOVE", "WRITE"}
-	isModel := false
-	isPath := false
-
-	for i := 0; i < len(models); i++ {
-		val := models[i]
-		if val == eventName {
-			isModel = true
+	defer func(watcher *fsnotify.Watcher) {
+		err := watcher.Close()
+		if err != nil {
+			panic(err)
 		}
-	}
-	matchString, _ := regexp.MatchString("~", eventPath)
-	if !matchString {
-		isPath = true
-	}
-
-	return isModel && isPath
+	}(watcher)
 }
 
 func watcherDirs(dirPth string, watcher *fsnotify.Watcher) {
