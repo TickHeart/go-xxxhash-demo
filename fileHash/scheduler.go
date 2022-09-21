@@ -50,7 +50,7 @@ func writeModel(eventPath, eventName string, watcher *fsnotify.Watcher) {
 		//if len(body) <= 0 {
 		//	return
 		//}
-		UpdateFilenameXXHash(body, eventPath)
+		UpdateFilenameXXHash(body, eventPath, false)
 	}
 }
 
@@ -65,10 +65,17 @@ func FileRenameToXXHash(body string, path string) {
 	}
 }
 
-func UpdateFilenameXXHash(body string, path string) {
-	sum64String := xxhash.Sum64String(body)
+func UpdateFilenameXXHash(body string, path string, isHash bool) {
+	hash := ""
+	if !isHash {
+		sum64String := xxhash.Sum64String(body)
+		hash = strconv.FormatUint(sum64String, 10)
+	} else {
+		hash = body
+	}
+
 	compile := regexp.MustCompile("\\.[\\d]+\\.")
-	allString := compile.ReplaceAllString(path, "."+strconv.FormatUint(sum64String, 10)+".")
+	allString := compile.ReplaceAllString(path, "."+hash+".")
 	err := os.Rename(path, allString)
 	if err != nil {
 		return

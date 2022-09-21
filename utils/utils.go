@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,9 +20,7 @@ func GetDirs(dirPth string) []string {
 	if err != nil {
 		panic(err)
 	}
-	for _, file := range files {
-		fmt.Println(root, "==========", file)
-	}
+
 	return files
 }
 
@@ -43,9 +40,6 @@ func GetYamlFiles(dirPth string) []string {
 	})
 	if err != nil {
 		panic(err)
-	}
-	for _, file := range files {
-		fmt.Println(root, "==========", file)
 	}
 	return files
 }

@@ -14,6 +14,7 @@ import (
 var w sync.WaitGroup
 
 func WatcherInit() {
+
 	initialize("/Users/wuhongbin/Desktop/awesomeProject/hahaha")
 	watcher, err := fsnotify.NewWatcher()
 	watcherDirs("/Users/wuhongbin/Desktop/awesomeProject/hahaha", watcher)
@@ -89,19 +90,25 @@ func watcherDirs(dirPth string, watcher *fsnotify.Watcher) {
 	}
 }
 
+type YamlHash struct {
+	hash     string
+	fileName string
+}
+
 func initialize(dirPth string) {
+	utils.LogInfo("初始化开始")
 	yamlFiles := utils.GetYamlFiles(dirPth)
 
-	errYamlFiles := make(chan string, len(yamlFiles))
+	errYamlFiles := make(chan YamlHash, len(yamlFiles))
 
 	checkYamlHash(yamlFiles, errYamlFiles)
 
 	amendmentYamlFilesHash(errYamlFiles)
 
-	log.Println("检查结束")
+	utils.LogInfo("检查结束")
 }
 
-func checkYamlHash(yamlFiles []string, errYamlFiles chan string) {
+func checkYamlHash(yamlFiles []string, errYamlFiles chan YamlHash) {
 
 	if len(yamlFiles) <= 0 {
 		return
@@ -117,18 +124,30 @@ func checkYamlHash(yamlFiles []string, errYamlFiles chan string) {
 			matchString, _ := regexp.MatchString(strconv.FormatUint(sum64String, 10), file)
 
 			if !matchString {
-				errYamlFiles <- file
+				errYamlFiles <- YamlHash{
+					hash:     strconv.FormatUint(sum64String, 10),
+					fileName: file,
+				}
 			}
-
 		}()
 
 	}
 }
 
-func amendmentYamlFilesHash(errYamlFiles chan string) {
+func amendmentYamlFilesHash(errYamlFiles chan YamlHash) {
 	w.Wait()
 	close(errYamlFiles)
+	id := 1
 	for iv := range errYamlFiles {
-		log.Println("哈西出现错误", iv)
+		w.Add(1)
+		utils.LogInfo("哈西出现错误 " + iv.fileName)
+		go func(yamlInfo YamlHash) {
+			UpdateFilenameXXHash(yamlInfo.hash, yamlInfo.fileName, true)
+			utils.LogInfo("修改完成个数" + strconv.Itoa(id) + "：" + yamlInfo.fileName)
+			id += 1
+			w.Done()
+		}(iv)
 	}
+	w.Wait()
+	utils.LogInfo("所有文件 hash 修改成功")
 }
