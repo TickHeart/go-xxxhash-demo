@@ -8,7 +8,10 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
 )
+
+var w sync.WaitGroup
 
 func WatcherInit() {
 	initialize("/Users/wuhongbin/Desktop/awesomeProject/hahaha")
@@ -87,26 +90,45 @@ func watcherDirs(dirPth string, watcher *fsnotify.Watcher) {
 }
 
 func initialize(dirPth string) {
-	checkYamlHash(dirPth)
-}
-
-func checkYamlHash(dirPth string) {
 	yamlFiles := utils.GetYamlFiles(dirPth)
 
-	fileChanl := make(chan string, 1)
+	errYamlFiles := make(chan string, len(yamlFiles))
+
+	checkYamlHash(yamlFiles, errYamlFiles)
+
+	amendmentYamlFilesHash(errYamlFiles)
+
+	log.Println("检查结束")
+}
+
+func checkYamlHash(yamlFiles []string, errYamlFiles chan string) {
+
 	if len(yamlFiles) <= 0 {
 		return
 	}
 
 	for i := 0; i < len(yamlFiles); i++ {
+		w.Add(1)
 		file := yamlFiles[i]
 		go func() {
+			defer w.Done()
 			fileBody, _ := os.ReadFile(file)
 			sum64String := xxhash.Sum64String(string(fileBody))
 			matchString, _ := regexp.MatchString(strconv.FormatUint(sum64String, 10), file)
+
 			if !matchString {
-				UpdateFilenameXXHash(string(fileBody), file)
+				errYamlFiles <- file
 			}
+
 		}()
+
+	}
+}
+
+func amendmentYamlFilesHash(errYamlFiles chan string) {
+	w.Wait()
+	close(errYamlFiles)
+	for iv := range errYamlFiles {
+		log.Println("哈西出现错误", iv)
 	}
 }
