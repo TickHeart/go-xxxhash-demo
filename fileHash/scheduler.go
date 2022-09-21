@@ -34,7 +34,7 @@ func createModel(eventPath, eventName string, watcher *fsnotify.Watcher) {
 		//if len(body) <= 0 {
 		//	return
 		//}
-		fileRenameToXXHash(body, eventPath)
+		FileRenameToXXHash(body, eventPath)
 	} else {
 		err := watcher.Add(eventPath)
 		if err != nil {
@@ -50,11 +50,11 @@ func writeModel(eventPath, eventName string, watcher *fsnotify.Watcher) {
 		//if len(body) <= 0 {
 		//	return
 		//}
-		updateFilenameXXHash(body, eventPath)
+		UpdateFilenameXXHash(body, eventPath)
 	}
 }
 
-func fileRenameToXXHash(body string, path string) {
+func FileRenameToXXHash(body string, path string) {
 	sum64String := xxhash.Sum64String(body)
 	compile := regexp.MustCompile("yaml")
 	allString := compile.ReplaceAllString(path, "")
@@ -65,7 +65,7 @@ func fileRenameToXXHash(body string, path string) {
 	}
 }
 
-func updateFilenameXXHash(body string, path string) {
+func UpdateFilenameXXHash(body string, path string) {
 	sum64String := xxhash.Sum64String(body)
 	compile := regexp.MustCompile("\\.[\\d]+\\.")
 	allString := compile.ReplaceAllString(path, "."+strconv.FormatUint(sum64String, 10)+".")

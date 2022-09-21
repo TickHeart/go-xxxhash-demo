@@ -2,12 +2,16 @@ package fileHash
 
 import (
 	"awesomeProject/utils"
+	"github.com/cespare/xxhash/v2"
 	"github.com/fsnotify/fsnotify"
 	"log"
+	"os"
 	"regexp"
+	"strconv"
 )
 
 func WatcherInit() {
+	initialize("/Users/wuhongbin/Desktop/awesomeProject/hahaha")
 	watcher, err := fsnotify.NewWatcher()
 	watcherDirs("/Users/wuhongbin/Desktop/awesomeProject/hahaha", watcher)
 	if err != nil {
@@ -79,5 +83,30 @@ func watcherDirs(dirPth string, watcher *fsnotify.Watcher) {
 		if err != nil {
 			return
 		}
+	}
+}
+
+func initialize(dirPth string) {
+	checkYamlHash(dirPth)
+}
+
+func checkYamlHash(dirPth string) {
+	yamlFiles := utils.GetYamlFiles(dirPth)
+
+	fileChanl := make(chan string, 1)
+	if len(yamlFiles) <= 0 {
+		return
+	}
+
+	for i := 0; i < len(yamlFiles); i++ {
+		file := yamlFiles[i]
+		go func() {
+			fileBody, _ := os.ReadFile(file)
+			sum64String := xxhash.Sum64String(string(fileBody))
+			matchString, _ := regexp.MatchString(strconv.FormatUint(sum64String, 10), file)
+			if !matchString {
+				UpdateFilenameXXHash(string(fileBody), file)
+			}
+		}()
 	}
 }
