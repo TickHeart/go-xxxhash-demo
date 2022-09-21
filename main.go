@@ -4,7 +4,6 @@ import (
 	"awesomeProject/scheduler"
 	"awesomeProject/utils"
 	"log"
-	"sync"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -15,57 +14,46 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var wg sync.WaitGroup
-	wg.Add(1000)
-	startWatch(watcher, &wg)
-	wg.Wait()
+	startWatch(watcher)
+	defer watcher.Close()
 }
 
-func startWatch(watcher *fsnotify.Watcher, wg *sync.WaitGroup) {
+func startWatch(watcher *fsnotify.Watcher) {
 	var schedulerEvent *scheduler.Event
-	go func() {
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				log.Printf("%v", event)
-				if !ok {
-					log.Fatalln("接收失败")
-					return
-				}
-				schedulerEvent = &scheduler.Event{
-					Name: event.Op.String(),
-					Path: event.Name,
-				}
-				signal := schedulerEvent.IgnoreSignal()
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			log.Printf("%v, %v", event, ok)
+			if !ok {
+				return
+			}
+			schedulerEvent = &scheduler.Event{
+				Name: event.Op.String(),
+				Path: event.Name,
+			}
+			signal := schedulerEvent.IgnoreSignal()
 
-				if signal {
-					schedulerEvent.ModelSchedulerModel(watcher, wg)
-				}
+			if signal {
+				schedulerEvent.ModelSchedulerModel(watcher)
+			}
 
-				log.Println(event.String())
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					log.Println("error:", err)
-					return
-				}
+			log.Println(event.String())
+		case err, ok := <-watcher.Errors:
+			log.Printf("err: %v, %v", err, ok)
+			if !ok {
+				log.Println("error:", err)
+				return
 			}
 		}
-	}()
-	defer func(watcher *fsnotify.Watcher) {
-		err := watcher.Close()
-		if err != nil {
-			panic(err)
-		}
-	}(watcher)
+	}
 }
 
 func watcherDirs(dirPth string, watcher *fsnotify.Watcher) {
 	dirs := utils.GetDirs(dirPth)
-	for i := 1; i < len(dirs); i++ {
-		val := dirs[i]
-		err := watcher.Add(val)
+	for _, path := range dirs {
+		err := watcher.Add(path)
 		if err != nil {
-			return
+			log.Fatal(err)
 		}
 	}
 }

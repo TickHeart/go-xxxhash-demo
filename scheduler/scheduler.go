@@ -36,21 +36,21 @@ func (e *Event) IgnoreSignal() bool {
 	return isModel && isPath
 }
 
-func (e *Event) ModelSchedulerModel(watcher *fsnotify.Watcher, wg *sync.WaitGroup) {
+func (e *Event) ModelSchedulerModel(watcher *fsnotify.Watcher) {
 	switch e.Name {
 	case "CREATE":
-		go e.createModel(watcher, wg)
+		e.createModel(watcher)
 	case "REMOVE":
 
 	case "WRITE":
-		go e.writeModel(watcher, wg)
+		e.writeModel(watcher)
 	}
 }
 
-func (e *Event) createModel(watcher *fsnotify.Watcher, wg *sync.WaitGroup) {
+func (e *Event) createModel(watcher *fsnotify.Watcher) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	defer wg.Done()
+	// defer wg.Done()
 	ms, _ := regexp.MatchString("yaml", e.Path)
 	isHash, _ := regexp.MatchString("\\.[\\d]+\\.", e.Path)
 	if isHash {
@@ -70,10 +70,10 @@ func (e *Event) createModel(watcher *fsnotify.Watcher, wg *sync.WaitGroup) {
 		}
 	}
 }
-func (e *Event) writeModel(watcher *fsnotify.Watcher, wg *sync.WaitGroup) {
+func (e *Event) writeModel(watcher *fsnotify.Watcher) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	defer wg.Done()
+	// defer wg.Done()
 	ms, _ := regexp.MatchString("yaml", e.Path)
 	if ms {
 		file, _ := os.ReadFile(e.Path)

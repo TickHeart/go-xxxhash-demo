@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -18,9 +17,6 @@ func GetDirs(dirPth string) []string {
 	})
 	if err != nil {
 		panic(err)
-	}
-	for _, file := range files {
-		fmt.Println(file)
 	}
 	return files
 }
