@@ -13,8 +13,50 @@ import (
 
 var w sync.WaitGroup
 
-func WatcherInit() {
+type Event struct {
+	EventPath string
+	EventName string
+	wrs       sync.RWMutex
+}
 
+func (receiver *Event) SetInfo(event fsnotify.Event) {
+	receiver.EventName = event.Op.String()
+	receiver.EventName = event.Name
+}
+
+func (receiver *Event) IgnoreSignal() bool {
+	models := []string{"CREATE", "REMOVE", "WRITE"}
+	isModel := false
+	isPath := false
+
+	for i := 0; i < len(models); i++ {
+		val := models[i]
+		if val == receiver.EventName {
+			isModel = true
+		}
+	}
+	matchString, _ := regexp.MatchString("~", receiver.EventPath)
+	if !matchString {
+		isPath = true
+	}
+
+	return isModel && isPath
+}
+
+func (receiver *Event) inRLock(fn func() interface{}) interface{} {
+	receiver.wrs.RLock()
+	i := fn()
+	receiver.wrs.RUnlock()
+	return i
+}
+func (receiver *Event) inLock(fn func() interface{}) interface{} {
+	receiver.wrs.Lock()
+	i := fn()
+	receiver.wrs.Unlock()
+	return i
+}
+
+func WatcherInit() {
 	initialize("/Users/wuhongbin/Desktop/awesomeProject/hahaha")
 	watcher, err := fsnotify.NewWatcher()
 	watcherDirs("/Users/wuhongbin/Desktop/awesomeProject/hahaha", watcher)
@@ -37,12 +79,12 @@ func WatcherInit() {
 				if !ok {
 					return
 				}
-				eventPath := event.Name
-				eventName := event.Op.String()
-				signal := ignoreSignal(eventPath, eventName)
+				e := Event{}
+				e.SetInfo(event)
+				signal := e.IgnoreSignal()
 
 				if signal {
-					ModelSchedulerModel(eventPath, eventName, watcher)
+					ModelSchedulerModel(&e, watcher)
 				}
 
 				log.Println(event.String())
@@ -58,25 +100,6 @@ func WatcherInit() {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-func ignoreSignal(eventPath, eventName string) bool {
-	models := []string{"CREATE", "REMOVE", "WRITE"}
-	isModel := false
-	isPath := false
-
-	for i := 0; i < len(models); i++ {
-		val := models[i]
-		if val == eventName {
-			isModel = true
-		}
-	}
-	matchString, _ := regexp.MatchString("~", eventPath)
-	if !matchString {
-		isPath = true
-	}
-
-	return isModel && isPath
 }
 
 func watcherDirs(dirPth string, watcher *fsnotify.Watcher) {

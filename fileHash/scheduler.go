@@ -8,49 +8,57 @@ import (
 	"strconv"
 )
 
-func ModelSchedulerModel(eventPath, eventName string, watcher *fsnotify.Watcher) {
-	switch eventName {
+func ModelSchedulerModel(e *Event, watcher *fsnotify.Watcher) {
+	switch e.EventName {
 	case "CREATE":
-		createModel(eventPath, eventName, watcher)
+		createModel(e, watcher)
 		break
 	case "REMOVE":
 
 		break
 	case "WRITE":
-		writeModel(eventPath, eventName, watcher)
+		writeModel(e)
 		break
 	}
 }
 
-func createModel(eventPath, eventName string, watcher *fsnotify.Watcher) {
-	ms, _ := regexp.MatchString("yaml", eventPath)
-	isHash, _ := regexp.MatchString("\\.[\\d]+\\.", eventPath)
+func createModel(e *Event, watcher *fsnotify.Watcher) {
+	ms, _ := regexp.MatchString("yaml", e.EventPath)
+	isHash, _ := regexp.MatchString("\\.[\\d]+\\.", e.EventPath)
 	if isHash {
 		return
 	}
 	if ms {
-		file, _ := os.ReadFile(eventPath)
-		body := string(file)
-		//if len(body) <= 0 {
-		//	return
-		//}
-		FileRenameToXXHash(body, eventPath)
+		lock := e.inRLock(func() interface{} {
+			file, _ := os.ReadFile(e.EventPath)
+			body := string(file)
+			return body
+		})
+		e.inLock(func() interface{} {
+			FileRenameToXXHash(lock.(string), e.EventPath)
+			return true
+		})
 	} else {
-		err := watcher.Add(eventPath)
+		err := watcher.Add(e.EventPath)
 		if err != nil {
 			return
 		}
 	}
 }
-func writeModel(eventPath, eventName string, watcher *fsnotify.Watcher) {
-	ms, _ := regexp.MatchString("yaml", eventPath)
+
+func writeModel(e *Event) {
+	ms, _ := regexp.MatchString("yaml", e.EventPath)
 	if ms {
-		file, _ := os.ReadFile(eventPath)
-		body := string(file)
-		//if len(body) <= 0 {
-		//	return
-		//}
-		UpdateFilenameXXHash(body, eventPath, false)
+		lock := e.inRLock(func() interface{} {
+			file, _ := os.ReadFile(e.EventPath)
+			body := string(file)
+			return body
+		})
+		e.inLock(func() interface{} {
+			UpdateFilenameXXHash(lock.(string), e.EventPath, false)
+			return true
+		})
+
 	}
 }
 
