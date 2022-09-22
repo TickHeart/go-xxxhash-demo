@@ -1,0 +1,8 @@
+mode: add
+list:
+  -
+    name: user1
+    age: 18
+  -
+    name: user2
+    age: 19

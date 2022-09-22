@@ -4,6 +4,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/fsnotify/fsnotify"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 )
@@ -62,15 +63,17 @@ func writeModel(e *Event) {
 	}
 }
 
-func FileRenameToXXHash(body string, path string) {
+func FileRenameToXXHash(body string, path string) string {
 	sum64String := xxhash.Sum64String(body)
 	compile := regexp.MustCompile("yaml")
 	allString := compile.ReplaceAllString(path, "")
 	allString = allString + strconv.FormatUint(sum64String, 10) + ".yaml"
 	err := os.Rename(path, allString)
 	if err != nil {
-		return
+		return ""
 	}
+	_, file := filepath.Split(path)
+	return filepath.Base(file)
 }
 
 func UpdateFilenameXXHash(body string, path string, isHash bool) {
