@@ -1,6 +1,7 @@
 package fileHash
 
 import (
+	"awesomeProject/cache"
 	"github.com/cespare/xxhash/v2"
 	"github.com/fsnotify/fsnotify"
 	"os"
@@ -88,6 +89,7 @@ func UpdateFilenameXXHash(body string, path string, isHash bool) {
 	compile := regexp.MustCompile("\\.[\\d]+\\.")
 	allString := compile.ReplaceAllString(path, "."+hash+".")
 	err := os.Rename(path, allString)
+	cache.SetMapCache(path)
 	if err != nil {
 		return
 	}

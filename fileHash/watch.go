@@ -1,6 +1,7 @@
 package fileHash
 
 import (
+	"awesomeProject/cache"
 	"awesomeProject/utils"
 	"github.com/cespare/xxhash/v2"
 	"github.com/fsnotify/fsnotify"
@@ -21,7 +22,7 @@ type Event struct {
 
 func (receiver *Event) SetInfo(event fsnotify.Event) {
 	receiver.EventName = event.Op.String()
-	receiver.EventName = event.Name
+	receiver.EventPath = event.Name
 }
 
 func (receiver *Event) IgnoreSignal() bool {
@@ -39,7 +40,6 @@ func (receiver *Event) IgnoreSignal() bool {
 	if !matchString {
 		isPath = true
 	}
-
 	return isModel && isPath
 }
 
@@ -56,49 +56,53 @@ func (receiver *Event) inLock(fn func() interface{}) interface{} {
 	return i
 }
 
-func WatcherInit() {
-	initialize("/Users/wuhongbin/Desktop/awesomeProject/hahaha")
-	watcher, err := fsnotify.NewWatcher()
-	watcherDirs("/Users/wuhongbin/Desktop/awesomeProject/hahaha", watcher)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(watcher *fsnotify.Watcher) {
-		log.Println("监听结束")
-		err := watcher.Close()
+var Watcher *fsnotify.Watcher
+
+func WatcherInit(cacheMap cache.MapCacheType) {
+	if Watcher == nil {
+		initialize("/Users/wuhongbin/Desktop/awesomeProject/hahaha/hash", cacheMap)
+		log.Println(cache.MapCache)
+		watcher, err := fsnotify.NewWatcher()
+		Watcher = watcher
+		watcherDirs("/Users/wuhongbin/Desktop/awesomeProject/hahaha/hash", watcher)
 		if err != nil {
-
+			log.Fatal(err)
 		}
-	}(watcher)
-	err = watcher.Add("/Users/wuhongbin/Desktop/awesomeProject/hahaha")
-	log.Println("确认已经开始监听")
-	func() {
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				e := Event{}
-				e.SetInfo(event)
-				signal := e.IgnoreSignal()
+		defer func(watcher *fsnotify.Watcher) {
+			log.Println("监听结束")
+			err := watcher.Close()
+			if err != nil {
 
-				if signal {
-					ModelSchedulerModel(&e, watcher)
-				}
-
-				log.Println(event.String())
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-				log.Println("error:", err)
 			}
-		}
-	}()
+		}(watcher)
+		err = watcher.Add("/Users/wuhongbin/Desktop/awesomeProject/hahaha/hash")
+		log.Println("确认已经开始监听")
+		func() {
+			for {
+				select {
+				case event, ok := <-watcher.Events:
+					if !ok {
+						return
+					}
+					e := Event{}
+					e.SetInfo(event)
+					signal := e.IgnoreSignal()
+					if signal {
+						ModelSchedulerModel(&e, watcher)
+					}
 
-	if err != nil {
-		log.Fatal(err)
+				case err, ok := <-watcher.Errors:
+					if !ok {
+						return
+					}
+					log.Println("error:", err)
+				}
+			}
+		}()
+
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
@@ -118,20 +122,20 @@ type YamlHash struct {
 	fileName string
 }
 
-func initialize(dirPth string) {
+func initialize(dirPth string, mapCache cache.MapCacheType) {
 	utils.LogInfo("初始化开始")
 	yamlFiles := utils.GetYamlFiles(dirPth)
 
 	errYamlFiles := make(chan YamlHash, len(yamlFiles))
 
-	checkYamlHash(yamlFiles, errYamlFiles)
+	checkYamlHash(yamlFiles, errYamlFiles, mapCache)
 
 	amendmentYamlFilesHash(errYamlFiles)
 
 	utils.LogInfo("检查结束")
 }
 
-func checkYamlHash(yamlFiles []string, errYamlFiles chan YamlHash) {
+func checkYamlHash(yamlFiles []string, errYamlFiles chan YamlHash, mapCache cache.MapCacheType) {
 
 	if len(yamlFiles) <= 0 {
 		return
@@ -145,7 +149,7 @@ func checkYamlHash(yamlFiles []string, errYamlFiles chan YamlHash) {
 			fileBody, _ := os.ReadFile(file)
 			sum64String := xxhash.Sum64String(string(fileBody))
 			matchString, _ := regexp.MatchString(strconv.FormatUint(sum64String, 10), file)
-
+			cache.SetMapCache(file)
 			if !matchString {
 				errYamlFiles <- YamlHash{
 					hash:     strconv.FormatUint(sum64String, 10),
