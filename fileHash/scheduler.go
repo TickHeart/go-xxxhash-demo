@@ -2,25 +2,22 @@ package fileHash
 
 import (
 	"awesomeProject/cache"
-	"github.com/cespare/xxhash/v2"
-	"github.com/fsnotify/fsnotify"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
+
+	"github.com/cespare/xxhash/v2"
+	"github.com/fsnotify/fsnotify"
 )
 
 func ModelSchedulerModel(e *Event, watcher *fsnotify.Watcher) {
 	switch e.EventName {
 	case "CREATE":
 		createModel(e, watcher)
-		break
 	case "REMOVE":
-
-		break
 	case "WRITE":
 		writeModel(e)
-		break
 	}
 }
 
@@ -50,6 +47,7 @@ func createModel(e *Event, watcher *fsnotify.Watcher) {
 
 func writeModel(e *Event) {
 	ms, _ := regexp.MatchString("yaml", e.EventPath)
+
 	if ms {
 		lock := e.inRLock(func() interface{} {
 			file, _ := os.ReadFile(e.EventPath)
@@ -86,7 +84,7 @@ func UpdateFilenameXXHash(body string, path string, isHash bool) {
 		hash = body
 	}
 
-	compile := regexp.MustCompile("\\.[\\d]+\\.")
+	compile := regexp.MustCompile(`\\.[\\d]+\\.`)
 	allString := compile.ReplaceAllString(path, "."+hash+".")
 	err := os.Rename(path, allString)
 	cache.SetMapCache(path)
